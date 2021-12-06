@@ -50,7 +50,7 @@ namespace Microservice.BestStories.Controllers
                 {
                     results.Add(task.Result);
                 }
-                return Ok(results);
+                return Ok(results.OrderByDescending(x => x.Score));
             }
             catch (Exception ex)
             {
