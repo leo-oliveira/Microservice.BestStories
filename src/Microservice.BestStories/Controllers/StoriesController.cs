@@ -1,5 +1,5 @@
-﻿using Microservice.BestStories.HackerNews;
-using Microservice.BestStories.HackerNews.Models;
+﻿using Microservice.BestStories.Services;
+using Microservice.BestStories.Services.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Microservice.BestStories.Controllers
@@ -17,31 +18,40 @@ namespace Microservice.BestStories.Controllers
     public class StoriesController : ControllerBase
     {
         private readonly ILogger<StoriesController> _logger;
+        private readonly IMemoryCacheService _memoryCacheService;
         private readonly IHackerNewsService _hackerNewsService;
 
-        public StoriesController(ILogger<StoriesController> logger,
+        public StoriesController(
+            ILogger<StoriesController> logger,
+            IMemoryCacheService memoryCacheService,
             IHackerNewsService hackerNewsService)
         {
             _logger = logger;
+            _memoryCacheService = memoryCacheService;
             _hackerNewsService = hackerNewsService;
         }
 
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<StoryDetail>))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult> GetAsync(int top = 20)
+        // using CancellationToken to prevent canceled calls from proceeding
+        public async Task<ActionResult> GetAsync(CancellationToken cancellationToken)
         {
             try
             {
-                if (top > 500) return BadRequest("The number of stories cannot be greater than 500");
+                cancellationToken.ThrowIfCancellationRequested();
+                _logger.LogInformation($"Getting 20 best stories");
 
-                _logger.LogInformation($"Getting {top} best stories");
+                var cachedStories = _memoryCacheService.GetCachedStories();
+                if (cachedStories != null) 
+                    return Ok(cachedStories);
+
                 var storyTasks = new List<Task<StoryDetail>>();
-                var bestTwentyStoriesIds = await _hackerNewsService.GetFirstBestStoriesIds(top);
+                var bestTwentyStoriesIds = await _hackerNewsService.GetTwentyFirstBestStoriesIdsAsync(cancellationToken);
                 foreach (var id in bestTwentyStoriesIds)
                 {
-                    storyTasks.Add(_hackerNewsService.GetStoryDetailsById(id));
+                    cancellationToken.ThrowIfCancellationRequested();
+                    storyTasks.Add(_hackerNewsService.GetStoryDetailsByIdAsync(id, cancellationToken));
                 }
                 await Task.WhenAll(storyTasks);
 
@@ -50,7 +60,9 @@ namespace Microservice.BestStories.Controllers
                 {
                     results.Add(task.Result);
                 }
-                return Ok(results.OrderByDescending(x => x.Score));
+                var twentyBestStories = results.OrderByDescending(x => x.Score).ToList();
+                _memoryCacheService.SetCachedStories(twentyBestStories);
+                return Ok(twentyBestStories);
             }
             catch (Exception ex)
             {

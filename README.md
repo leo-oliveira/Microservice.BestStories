@@ -1,6 +1,6 @@
 # Best Stories API
 
-The goal of this API is to get detailed information of the 20 first best stories from Hacker News. Although 20 is the default number of stories, the api allows getting the amount of stories you want, up to 500 stories (Hacker News API limitation).
+The goal of this API is to get detailed information of the 20 first best stories from Hacker News.
 
 ## Run the application
 

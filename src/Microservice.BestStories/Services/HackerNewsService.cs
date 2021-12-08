@@ -1,23 +1,26 @@
-﻿using Microservice.BestStories.HackerNews.Models;
+﻿using Microservice.BestStories.Services.Models;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
-namespace Microservice.BestStories.HackerNews
+namespace Microservice.BestStories.Services
 {
     public class HackerNewsService : IHackerNewsService
     {
         private readonly IHttpClientFactory _clientFactory;
+        private HttpClient hackerNewsClient;
 
         private HttpClient HackerNewsClient
         {
             get
             {
-                return _clientFactory.CreateClient("HackerNews");
+                if(hackerNewsClient == null) hackerNewsClient = _clientFactory.CreateClient("HackerNews");
+                return hackerNewsClient;
             }
         }
 
@@ -26,27 +29,31 @@ namespace Microservice.BestStories.HackerNews
             _clientFactory = clientFactory;
         }
 
-        public async Task<IEnumerable<int>> GetFirstBestStoriesIds(int top = 20)
+        public async Task<IEnumerable<int>> GetTwentyFirstBestStoriesIdsAsync(CancellationToken cancellationToken)
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, "beststories.json");
+            cancellationToken.ThrowIfCancellationRequested();
+            
+            using var request = new HttpRequestMessage(HttpMethod.Get, "beststories.json");
 
-            var response = await HackerNewsClient.SendAsync(request);
+            var response = await HackerNewsClient.SendAsync(request, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
                 using var responseStream = await response.Content.ReadAsStreamAsync();
                 var bestStories = DeserializeJson<IEnumerable<int>>(responseStream);
-                return bestStories.Take(top);
+                return bestStories.Take(20);
             }
 
-            throw new Exception($"Error trying to get the first {top} stories IDs: {response.ReasonPhrase}");
+            throw new Exception($"Error trying to get the first 20 stories IDs: {response.ReasonPhrase}");
         }
 
-        public async Task<StoryDetail> GetStoryDetailsById(int id)
+        public async Task<StoryDetail> GetStoryDetailsByIdAsync(int id, CancellationToken cancellationToken)
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, $"item/{id}.json");
+            cancellationToken.ThrowIfCancellationRequested();
+            
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"item/{id}.json");
 
-            var response = await HackerNewsClient.SendAsync(request);
+            var response = await HackerNewsClient.SendAsync(request, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {

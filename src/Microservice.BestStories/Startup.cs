@@ -1,4 +1,5 @@
-using Microservice.BestStories.HackerNews;
+using Microservice.BestStories.Services;
+using Microservice.BestStories.Middlewares;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -22,19 +23,24 @@ namespace Microservice.BestStories
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddControllers();
+            services.AddMemoryCache();
+
             services.AddHttpClient("HackerNews", c =>
             {
                 c.BaseAddress = new Uri(Configuration["HackerNewsAPI"]);
             });
 
+            //register services
             services.AddScoped<IHackerNewsService, HackerNewsService>();
+            services.AddSingleton<IMemoryCacheService, MemoryCacheService>();
+
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo
                 {
                     Title = "BestStories API",
                     Version = "v1",
-                    Description = "API that returns details about the best x stories"
+                    Description = "API that returns details about the best 20 stories"
                 });
             });
         }
@@ -45,6 +51,11 @@ namespace Microservice.BestStories
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
+            }
+            else
+            {
+                //catch all unhandled exceptions
+                app.UseMiddleware<ErrorHandlerMiddleware>();
             }
 
             app.UseSwagger();

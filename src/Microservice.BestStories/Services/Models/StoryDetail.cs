@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace Microservice.BestStories.HackerNews.Models
+namespace Microservice.BestStories.Services.Models
 {
     public class StoryDetail
     {
